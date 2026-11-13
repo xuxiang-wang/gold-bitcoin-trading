@@ -1,0 +1,442 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Gold and Bitcoin Backtester · Xuxiang Wang</title>
+<meta name="description" content="Interactive backtest for 2022 MCM Problem C: choose a risk level, a bitcoin limit and commissions, and rerun five years of daily gold and bitcoin trading.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Shared site tokens: identical on every page of the site. Series colors are this page's own. */
+:root {
+  --bg: #f7f8fa; --surface: #ffffff; --ink: #12161c; --ink-2: #3d4450; --ink-3: #5b6472;
+  --rule: #dde1e7; --rule-strong: #c4cad3; --link: #1f62b8; --link-hover: #174c8f;
+  --accent: #1f62b8; --accent-soft: #e3eefb;
+  --series-strategy: #2a78d6; --series-bitcoin: #eb6834; --series-split: #1baf7a; --series-gold: #eda100; --cash: #c9ced6;
+  --font-display: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-data: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #111418; --surface: #181c22; --ink: #eef0f3; --ink-2: #c3c9d2; --ink-3: #9aa2ae;
+    --rule: #2a3039; --rule-strong: #3a424d; --link: #7cb0f2; --link-hover: #a6c9f6;
+    --accent: #3987e5; --accent-soft: #1b2a3d;
+    --series-strategy: #3987e5; --series-bitcoin: #d95926; --series-split: #199e70; --series-gold: #c98500; --cash: #3a414b;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #111418; --surface: #181c22; --ink: #eef0f3; --ink-2: #c3c9d2; --ink-3: #9aa2ae;
+  --rule: #2a3039; --rule-strong: #3a424d; --link: #7cb0f2; --link-hover: #a6c9f6;
+  --accent: #3987e5; --accent-soft: #1b2a3d;
+  --series-strategy: #3987e5; --series-bitcoin: #d95926; --series-split: #199e70; --series-gold: #c98500; --cash: #3a414b;
+  color-scheme: dark;
+}
+a { color: var(--link); text-decoration: none; }
+a:hover { color: var(--link-hover); text-decoration: underline; }
+.site-nav { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 12px 24px;
+  border-bottom: 1px solid var(--rule); padding-bottom: 16px; }
+.site-nav .name { font-weight: 600; font-size: 18px; color: var(--ink); }
+.site-nav .links { display: flex; flex-wrap: wrap; gap: 8px 24px; font-size: 15px; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.55; }
+.page { max-width: 1040px; margin: 0 auto; padding-block: 40px 64px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; gap: 32px; }
+.eyebrow { font-family: var(--font-data); font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-3); }
+h1 { font-family: var(--font-display); font-weight: 500; font-size: clamp(28px, 4.5vw, 38px); line-height: 1.15; margin: 8px 0 12px; text-wrap: balance; letter-spacing: -0.02em; }
+h2 { font-family: var(--font-display); font-weight: 600; font-size: 22px; margin: 0; text-wrap: balance; }
+.lede { max-width: 66ch; color: var(--ink-2); margin: 0; }
+.lede strong { color: var(--ink); font-weight: 600; }
+
+.controls { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 20px; display: grid; gap: 20px;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); }
+.control { display: grid; gap: 8px; align-content: start; min-width: 0; }
+.control-label { display: flex; justify-content: space-between; gap: 8px; font-weight: 600; font-size: 13px; }
+.control-label output { font-family: var(--font-data); font-weight: 500; color: var(--accent); }
+.hint { font-size: 12.5px; color: var(--ink-3); line-height: 1.45; }
+.segments { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+.segments button { font: inherit; font-size: 12.5px; padding: 7px 4px; border-radius: 6px; border: 1px solid var(--rule-strong);
+  background: transparent; color: var(--ink-2); cursor: pointer; line-height: 1.2; }
+.segments button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+.segments button:hover:not([aria-pressed="true"]) { border-color: var(--accent); color: var(--ink); }
+input[type="range"] { width: 100%; accent-color: var(--accent); }
+select { font: inherit; font-size: 13px; padding: 6px 8px; border-radius: 6px; border: 1px solid var(--rule-strong); background: var(--surface); color: var(--ink); width: 100%; }
+.radio-row { display: grid; gap: 6px; font-size: 13px; }
+.radio-row label { display: flex; gap: 8px; align-items: flex-start; cursor: pointer; }
+.radio-row input { margin-top: 3px; accent-color: var(--accent); }
+.pair { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.pair label { display: grid; gap: 4px; font-size: 12px; color: var(--ink-3); }
+.reset { justify-self: start; font: inherit; font-size: 12.5px; color: var(--accent); background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.ledger { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); border-top: 2px solid var(--ink); }
+.ledger div { padding: 14px 14px 14px 0; border-bottom: 1px solid var(--rule); display: grid; gap: 2px; min-width: 0; }
+.ledger dt { font-size: 12px; color: var(--ink-3); }
+.ledger dd { margin: 0; font-family: var(--font-data); font-size: 22px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.ledger .compare { font-family: var(--font-data); font-size: 12px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.status { font-size: 12.5px; color: var(--ink-3); min-height: 1.4em; }
+
+.chart-block { display: grid; gap: 10px; min-width: 0; }
+.chart-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 8px 20px; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 12.5px; color: var(--ink-2); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { width: 14px; height: 3px; border-radius: 2px; display: inline-block; }
+.legend i.box { height: 10px; width: 10px; border-radius: 2px; }
+.chart { position: relative; width: 100%; }
+.chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+.chart text { fill: var(--ink-3); font-family: var(--font-data); font-size: 11px; }
+.tooltip { position: absolute; pointer-events: none; background: var(--surface); border: 1px solid var(--rule-strong); border-radius: 6px;
+  padding: 8px 10px; font-size: 12px; box-shadow: 0 4px 14px rgba(0,0,0,.12); min-width: 170px; z-index: 2; }
+.tooltip .t-date { font-family: var(--font-data); color: var(--ink-3); margin-bottom: 4px; }
+.tooltip .t-row { display: flex; justify-content: space-between; gap: 12px; font-variant-numeric: tabular-nums; }
+.tooltip .t-row b { font-family: var(--font-data); font-weight: 500; }
+.tooltip .t-key { display: inline-flex; align-items: center; gap: 6px; color: var(--ink-2); }
+.tooltip .t-key i { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
+.two-col { display: grid; gap: 32px; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+
+.findings { display: grid; gap: 14px; max-width: 72ch; }
+.findings p { margin: 0; color: var(--ink-2); }
+.findings p strong { color: var(--ink); font-weight: 600; }
+.note { border-left: 3px solid var(--rule-strong); padding: 2px 0 2px 14px; color: var(--ink-2); font-size: 14px; }
+.table-wrap { overflow-x: auto; }
+table { border-collapse: collapse; font-size: 13px; width: 100%; min-width: 520px; }
+th, td { text-align: right; padding: 7px 10px; border-bottom: 1px solid var(--rule); font-variant-numeric: tabular-nums; }
+th:first-child, td:first-child { text-align: left; }
+th { font-weight: 600; color: var(--ink-2); font-size: 12px; border-bottom: 1px solid var(--rule-strong); }
+td { font-family: var(--font-data); }
+td:first-child { font-family: var(--font-body); }
+footer { font-size: 12.5px; color: var(--ink-3); border-top: 1px solid var(--rule); padding-top: 16px; display: grid; gap: 6px; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="page">
+  <nav class="site-nav" aria-label="Site">
+    <a class="name" href="../../">Xuxiang Wang</a>
+    <div class="links">
+      <a href="../../#research">Research</a>
+      <a href="../../#projects">Projects</a>
+      <a href="https://github.com/xuxiang-wang/gold-bitcoin-trading">Code</a>
+    </div>
+  </nav>
+
+  <header>
+    <div class="eyebrow">2022 MCM Problem C · Honorable Mention · reproducible analysis</div>
+    <h1>Pick a risk level and see what five years of daily trading would have returned</h1>
+    <p class="lede">Start with <strong>$1,000 on 9/11/2016</strong>. Every day the strategy looks only at prices up to that day and decides whether to buy, hold or sell gold and bitcoin, paying <strong>1% per gold trade and 2% per bitcoin trade</strong>. Gold trades only on days the London market sets a price. Change the settings below and the full 1,826-day backtest reruns in your browser.</p>
+  </header>
+
+  <section class="controls" aria-label="Strategy settings">
+    <div class="control">
+      <div class="control-label"><span id="risk-label">Risk tolerance</span><output id="risk-out"></output></div>
+      <div class="segments" role="group" aria-labelledby="risk-label" id="risk"></div>
+      <div class="hint">How much short-term loss you accept for expected gain. Internally, the risk-aversion weight in the mean-variance objective.</div>
+    </div>
+    <div class="control">
+      <div class="control-label"><label for="cap">Most bitcoin allowed</label><output id="cap-out" for="cap"></output></div>
+      <input type="range" id="cap" min="0" max="100" step="5" value="100">
+      <div class="hint">A hard limit on bitcoin's share of the portfolio. If a price rise pushes it above the limit, the strategy sells down.</div>
+    </div>
+    <div class="control">
+      <div class="control-label"><label for="cost">Commissions</label><output id="cost-out" for="cost"></output></div>
+      <input type="range" id="cost" min="0" max="3" step="0.25" value="1">
+      <div class="hint">Scales both rates. The contest used 1× (1% gold, 2% bitcoin).</div>
+      <button class="reset" id="reset" type="button">Back to the default settings</button>
+    </div>
+  </section>
+
+  <section aria-labelledby="results-title" class="chart-block">
+    <div class="chart-head">
+      <h2 id="results-title">Your strategy on 9/10/2021</h2>
+      <div class="status" id="status" aria-live="polite"></div>
+    </div>
+    <dl class="ledger" id="ledger"></dl>
+  </section>
+
+  <section class="chart-block" aria-labelledby="value-title">
+    <div class="chart-head">
+      <h2 id="value-title">Portfolio value, log scale</h2>
+      <div class="legend" id="value-legend"></div>
+    </div>
+    <div class="chart" id="value-chart"></div>
+  </section>
+
+  <div class="two-col">
+    <section class="chart-block" aria-labelledby="alloc-title">
+      <div class="chart-head">
+        <h2 id="alloc-title">Where the money sat</h2>
+        <div class="legend"><span><i class="box" style="background:var(--series-bitcoin)"></i>Bitcoin</span><span><i class="box" style="background:var(--series-gold)"></i>Gold</span><span><i class="box" style="background:var(--cash)"></i>Cash</span></div>
+      </div>
+      <div class="chart" id="alloc-chart"></div>
+    </section>
+    <section class="chart-block" aria-labelledby="map-title">
+      <div class="chart-head">
+        <h2 id="map-title">Risk and reward of 24 preset choices</h2>
+        <div class="legend"><span><i class="box" style="background:var(--ink-3)"></i>Preset (6 risk levels × 4 bitcoin limits)</span><span><i class="box" style="background:var(--series-strategy)"></i>Your choice</span><span><i class="box" style="background:var(--series-bitcoin)"></i>Buy and hold</span></div>
+      </div>
+      <div class="chart" id="map-chart"></div>
+    </section>
+  </div>
+
+  <section class="findings" aria-labelledby="findings-title">
+    <h2 id="findings-title">What the analysis found</h2>
+    <p><strong>The strategy did not beat buying and holding bitcoin.</strong> Bitcoin rose about 75-fold in these five years. Holding it turned $1,000 into $73,127, but at one point the position was down 83% from its peak. At the default settings the strategy ended at $21,064 with a worst drop of 46% and almost the same return per unit of risk (Sharpe ratio 1.50 vs 1.49).</p>
+    <p><strong>Risk tolerance and the bitcoin limit trade final value for smaller losses.</strong> Every step toward caution lowers both the final value and the worst drop. The map above shows the trade-off.</p>
+    <p class="note">A trader who knew every future price could have reached about $33.7 billion, which is why very large reported returns usually mean future prices leaked into the decisions.</p>
+  </section>
+
+  <footer>
+    <div>Method: each day, expected returns are exponentially weighted averages of past returns and risk is an exponentially weighted covariance. The strategy picks weights that maximize horizon × expected return − ½ × risk aversion × horizon × variance − commissions, with no short selling or borrowing, solved exactly for each buy/sell direction. Momentum half-life and holding horizon are fixed at 30 days. This method was chosen over an LSTM return forecast trained only on past data, which did worse; the comparison is in the <a href="https://github.com/xuxiang-wang/gold-bitcoin-trading">project repository</a>. The browser engine is a port of the project's R code and matches its results to within 1 part in 10<sup>13</sup>.</div>
+    <div>Data: LBMA gold (USD PM) and bitcoin prices supplied with the 2022 MCM Problem C, © COMAP.</div>
+  </footer>
+</div>
+
+<script>
+/*DATA*/
+/*ENGINE*/
+</script>
+<script>
+(function () {
+  const P = preparePrices(PRICE_DATA.bitcoin, PRICE_DATA.gold);
+  const RISK = [["Very aggressive", 1], ["Aggressive", 2], ["Moderate", 5], ["Cautious", 10], ["Very cautious", 20], ["Most cautious", 50]];
+  const state = { risk: 5, cap: 100, cost: 1 };
+  const $ = id => document.getElementById(id);
+  const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  const money = x => "$" + Math.round(x).toLocaleString("en-US");
+  const pct = x => (100 * x).toFixed(0) + "%";
+  const dateLabel = iso => { const [y, m, d] = iso.split("-"); return `${+m}/${+d}/${y}`; };
+
+  // ---- controls ----
+  const riskBox = $("risk");
+  RISK.forEach(([name, value]) => {
+    const b = document.createElement("button");
+    b.type = "button"; b.textContent = name; b.dataset.value = value;
+    b.addEventListener("click", () => { state.risk = value; sync(); schedule(); });
+    riskBox.appendChild(b);
+  });
+  $("cap").addEventListener("input", e => { state.cap = +e.target.value; sync(); schedule(); });
+  $("cost").addEventListener("input", e => { state.cost = +e.target.value; sync(); schedule(); });
+  $("reset").addEventListener("click", () => { Object.assign(state, { risk: 5, cap: 100, cost: 1 }); sync(); schedule(); });
+
+  function sync() {
+    riskBox.querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(+b.dataset.value === state.risk)));
+    $("risk-out").textContent = "weight " + state.risk;
+    $("cap").value = state.cap; $("cap-out").textContent = state.cap + "%";
+    $("cost").value = state.cost;
+    $("cost-out").textContent = state.cost === 0 ? "none" : `${state.cost}× (${(state.cost).toFixed(2).replace(/\.?0+$/, "")}% gold, ${(2 * state.cost).toFixed(2).replace(/\.?0+$/, "")}% bitcoin)`;
+  }
+
+  let timer = null;
+  function schedule() { $("status").textContent = "Rerunning 1,826 days…"; clearTimeout(timer); timer = setTimeout(update, 30); }
+
+  // ---- charts ----
+  function makeSvg(container, width, height) {
+    container.innerHTML = "";
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+    svg.setAttribute("role", "img");
+    container.appendChild(svg);
+    return svg;
+  }
+  function el(svg, tag, attrs, text) {
+    const e = document.createElementNS("http://www.w3.org/2000/svg", tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    if (text !== undefined) e.textContent = text;
+    svg.appendChild(e);
+    return e;
+  }
+  function tooltip(container) {
+    let t = container.querySelector(".tooltip");
+    if (!t) { t = document.createElement("div"); t.className = "tooltip"; t.hidden = true; container.appendChild(t); }
+    return t;
+  }
+  function placeTooltip(t, container, x, y) {
+    const w = container.clientWidth, tw = t.offsetWidth;
+    t.style.left = Math.min(Math.max(0, x + 14), w - tw) + "px";
+    t.style.top = Math.max(0, y - 10) + "px";
+  }
+  const yearTicks = () => P.date.map((d, i) => [d, i]).filter(([d]) => d.endsWith("-01-01"));
+
+  function valueChart(series) {
+    const box = $("value-chart");
+    const W = Math.max(320, box.clientWidth), H = W < 560 ? 280 : 340;
+    const m = { l: 62, r: 12, t: 10, b: 26 };
+    const svg = makeSvg(box, W, H);
+    const all = series.flatMap(s => s.values);
+    const lo = Math.log10(Math.min(...all) * 0.9), hi = Math.log10(Math.max(...all) * 1.1);
+    const x = i => m.l + (W - m.l - m.r) * i / (P.n - 1);
+    const y = v => m.t + (H - m.t - m.b) * (1 - (Math.log10(v) - lo) / (hi - lo));
+    for (const v of [500, 1000, 2000, 5000, 10000, 20000, 50000, 100000]) {
+      if (Math.log10(v) < lo || Math.log10(v) > hi) continue;
+      el(svg, "line", { x1: m.l, x2: W - m.r, y1: y(v), y2: y(v), stroke: css("--rule"), "stroke-width": 1 });
+      el(svg, "text", { x: m.l - 8, y: y(v) + 4, "text-anchor": "end" }, money(v));
+    }
+    for (const [d, i] of yearTicks()) el(svg, "text", { x: x(i), y: H - 6, "text-anchor": "middle" }, d.slice(0, 4));
+    for (const s of series.slice().reverse()) {
+      let path = "";
+      for (let i = 0; i < P.n; i += 1) path += (i ? "L" : "M") + x(i).toFixed(1) + "," + y(s.values[i]).toFixed(1);
+      el(svg, "path", { d: path, fill: "none", stroke: css(s.color), "stroke-width": s.main ? 2.2 : 1.5, "stroke-linejoin": "round", opacity: s.main ? 1 : 0.9 });
+    }
+    const cross = el(svg, "line", { y1: m.t, y2: H - m.b, stroke: css("--ink-3"), "stroke-width": 1, opacity: 0 });
+    const dots = series.map(s => el(svg, "circle", { r: 4, fill: css(s.color), stroke: css("--surface"), "stroke-width": 2, opacity: 0 }));
+    const t = tooltip(box);
+    const hit = el(svg, "rect", { x: m.l, y: m.t, width: W - m.l - m.r, height: H - m.t - m.b, fill: "transparent" });
+    function show(evt) {
+      const r = svg.getBoundingClientRect();
+      const px = (evt.clientX - r.left) * W / r.width;
+      const i = Math.max(0, Math.min(P.n - 1, Math.round((px - m.l) / (W - m.l - m.r) * (P.n - 1))));
+      cross.setAttribute("x1", x(i)); cross.setAttribute("x2", x(i)); cross.setAttribute("opacity", 1);
+      dots.forEach((d, k) => { d.setAttribute("cx", x(i)); d.setAttribute("cy", y(series[k].values[i])); d.setAttribute("opacity", 1); });
+      t.innerHTML = `<div class="t-date">${dateLabel(P.date[i])}</div>` + series.map(s =>
+        `<div class="t-row"><span class="t-key"><i style="background:${css(s.color)}"></i>${s.name}</span><b>${money(s.values[i])}</b></div>`).join("");
+      t.hidden = false;
+      placeTooltip(t, box, x(i) * r.width / W, (evt.clientY - r.top));
+    }
+    hit.addEventListener("pointermove", show);
+    hit.addEventListener("pointerdown", show);
+    hit.addEventListener("pointerleave", () => { t.hidden = true; cross.setAttribute("opacity", 0); dots.forEach(d => d.setAttribute("opacity", 0)); });
+    $("value-legend").innerHTML = series.map(s => `<span><i style="background:${css(s.color)}"></i>${s.name}</span>`).join("");
+  }
+
+  function allocationChart(run) {
+    const box = $("alloc-chart");
+    const W = Math.max(300, box.clientWidth), H = 240;
+    const m = { l: 40, r: 8, t: 8, b: 26 };
+    const svg = makeSvg(box, W, H);
+    const x = i => m.l + (W - m.l - m.r) * i / (P.n - 1);
+    const y = v => m.t + (H - m.t - m.b) * (1 - v);
+    const step = 2;
+    const layer = (lower, upper, color) => {
+      let top = "", bottom = "";
+      for (let i = 0; i < P.n; i += step) top += (i ? "L" : "M") + x(i).toFixed(1) + "," + y(upper(i)).toFixed(1);
+      for (let i = Math.floor((P.n - 1) / step) * step; i >= 0; i -= step) bottom += "L" + x(i).toFixed(1) + "," + y(lower(i)).toFixed(1);
+      el(svg, "path", { d: top + bottom + "Z", fill: css(color) });
+    };
+    const b = i => Math.max(0, Math.min(1, run.bitcoinWeight[i]));
+    const g = i => Math.max(0, Math.min(1 - b(i), run.goldWeight[i]));
+    layer(() => 0, b, "--series-bitcoin");
+    layer(b, i => b(i) + g(i), "--series-gold");
+    layer(i => b(i) + g(i), () => 1, "--cash");
+    for (const v of [0, 0.5, 1]) el(svg, "text", { x: m.l - 6, y: y(v) + 4, "text-anchor": "end" }, pct(v));
+    for (const [d, i] of yearTicks()) el(svg, "text", { x: x(i), y: H - 6, "text-anchor": "middle" }, W > 420 ? d.slice(0, 4) : "’" + d.slice(2, 4));
+    const cross = el(svg, "line", { y1: m.t, y2: H - m.b, stroke: css("--ink"), "stroke-width": 1, opacity: 0 });
+    const t = tooltip(box);
+    const hit = el(svg, "rect", { x: m.l, y: m.t, width: W - m.l - m.r, height: H - m.t - m.b, fill: "transparent" });
+    function show(evt) {
+      const r = svg.getBoundingClientRect();
+      const px = (evt.clientX - r.left) * W / r.width;
+      const i = Math.max(0, Math.min(P.n - 1, Math.round((px - m.l) / (W - m.l - m.r) * (P.n - 1))));
+      cross.setAttribute("x1", x(i)); cross.setAttribute("x2", x(i)); cross.setAttribute("opacity", 0.6);
+      const rows = [["Bitcoin", b(i), "--series-bitcoin"], ["Gold", g(i), "--series-gold"], ["Cash", 1 - b(i) - g(i), "--cash"]];
+      t.innerHTML = `<div class="t-date">${dateLabel(P.date[i])}</div>` + rows.map(([n, v, c]) =>
+        `<div class="t-row"><span class="t-key"><i style="background:${css(c)}"></i>${n}</span><b>${pct(Math.max(0, v))}</b></div>`).join("");
+      t.hidden = false;
+      placeTooltip(t, box, x(i) * r.width / W, evt.clientY - r.top);
+    }
+    hit.addEventListener("pointermove", show);
+    hit.addEventListener("pointerdown", show);
+    hit.addEventListener("pointerleave", () => { t.hidden = true; cross.setAttribute("opacity", 0); });
+  }
+
+  let presetCache = { cost: null, points: [] };
+  function presetPoints(cost) {
+    if (presetCache.cost === cost) return presetCache.points;
+    const points = [];
+    for (const [name, risk] of RISK) for (const cap of [25, 50, 75, 100]) {
+      const s = summarize(runStrategy(P, { riskAversion: risk, maximumBitcoinWeight: cap / 100, costMultiplier: cost }).value);
+      points.push({ label: `${name}, bitcoin ≤ ${cap}%`, drawdown: s.maxDrawdown, value: s.finalValue });
+    }
+    presetCache = { cost, points };
+    return points;
+  }
+
+  function mapChart(current, benchmarks) {
+    const box = $("map-chart");
+    const W = Math.max(300, box.clientWidth), H = 240;
+    const m = { l: 62, r: 12, t: 10, b: 34 };
+    const svg = makeSvg(box, W, H);
+    const presets = presetPoints(state.cost);
+    const pts = presets.map(p => Object.assign({ kind: "preset" }, p))
+      .concat(benchmarks.map(p => Object.assign({ kind: "benchmark" }, p)))
+      .concat([Object.assign({ kind: "current" }, current)]);
+    const lo = Math.log10(Math.min(...pts.map(p => p.value)) * 0.8), hi = Math.log10(Math.max(...pts.map(p => p.value)) * 1.25);
+    const x = d => m.l + (W - m.l - m.r) * d;
+    const y = v => m.t + (H - m.t - m.b) * (1 - (Math.log10(v) - lo) / (hi - lo));
+    for (const v of [1000, 2000, 5000, 10000, 20000, 50000, 100000]) {
+      if (Math.log10(v) < lo || Math.log10(v) > hi) continue;
+      el(svg, "line", { x1: m.l, x2: W - m.r, y1: y(v), y2: y(v), stroke: css("--rule"), "stroke-width": 1 });
+      el(svg, "text", { x: m.l - 8, y: y(v) + 4, "text-anchor": "end" }, money(v));
+    }
+    for (const d of [0, 0.25, 0.5, 0.75, 1]) el(svg, "text", { x: x(d), y: H - 18, "text-anchor": "middle" }, pct(d));
+    el(svg, "text", { x: (m.l + W - m.r) / 2, y: H - 2, "text-anchor": "middle" }, "worst drop from a peak →");
+    const t = tooltip(box);
+    for (const p of pts) {
+      const color = p.kind === "current" ? css("--series-strategy") : p.kind === "benchmark" ? css("--series-bitcoin") : css("--ink-3");
+      const c = el(svg, "circle", { cx: x(p.drawdown), cy: y(p.value), r: p.kind === "current" ? 7 : 5, fill: color,
+        stroke: css("--surface"), "stroke-width": 2, opacity: p.kind === "preset" ? 0.65 : 1 });
+      const hitDot = el(svg, "circle", { cx: x(p.drawdown), cy: y(p.value), r: 11, fill: "transparent" });
+      const show = evt => {
+        const r = svg.getBoundingClientRect();
+        t.innerHTML = `<div class="t-date">${p.label}</div><div class="t-row"><span class="t-key">Value on 9/10/2021</span><b>${money(p.value)}</b></div><div class="t-row"><span class="t-key">Worst drop</span><b>${pct(p.drawdown)}</b></div>`;
+        t.hidden = false;
+        placeTooltip(t, box, x(p.drawdown) * r.width / W, y(p.value) * r.height / H);
+      };
+      hitDot.addEventListener("pointerenter", show);
+      hitDot.addEventListener("pointerdown", show);
+      hitDot.addEventListener("pointerleave", () => { t.hidden = true; });
+    }
+  }
+
+  // ---- results ----
+  let lastRun = null, lastSeries = null, lastCurrent = null, lastBench = null;
+  function update() {
+    const options = { riskAversion: state.risk, maximumBitcoinWeight: state.cap / 100, costMultiplier: state.cost };
+    const run = runStrategy(P, options);
+    const s = summarize(run.value);
+    const bitcoinHold = buyAndHold(P, state.cost, 0), splitHold = buyAndHold(P, state.cost, 0.5), goldHold = buyAndHold(P, state.cost, 1);
+    const bh = summarize(bitcoinHold);
+    const rows = [
+      ["Value", money(s.finalValue), "Hold bitcoin: " + money(bh.finalValue)],
+      ["Worst drop from a peak", pct(s.maxDrawdown), "Hold bitcoin: " + pct(bh.maxDrawdown)],
+      ["Annual volatility", pct(s.annualVolatility), "Hold bitcoin: " + pct(bh.annualVolatility)],
+      ["Sharpe ratio", s.sharpe.toFixed(2), "Hold bitcoin: " + bh.sharpe.toFixed(2)],
+      ["Trades", run.trades.toLocaleString("en-US"), "Hold bitcoin: 1"],
+      ["Commissions paid", money(run.feesPaid), "Hold bitcoin: " + money(1000 - 1000 / (1 + 0.02 * state.cost))]
+    ];
+    $("ledger").innerHTML = rows.map(([k, v, c]) => `<div><dt>${k}</dt><dd>${v}</dd><span class="compare">${c}</span></div>`).join("");
+    lastRun = run;
+    lastSeries = [
+      { name: "Your strategy", values: run.value, color: "--series-strategy", main: true },
+      { name: "Hold bitcoin", values: bitcoinHold, color: "--series-bitcoin" },
+      { name: "Hold 50/50", values: splitHold, color: "--series-split" },
+      { name: "Hold gold", values: goldHold, color: "--series-gold" }
+    ];
+    lastCurrent = { label: "Your choice", drawdown: s.maxDrawdown, value: s.finalValue };
+    lastBench = [["Hold bitcoin", bitcoinHold], ["Hold 50/50", splitHold]].map(([n, v]) => {
+      const q = summarize(v); return { label: n, drawdown: q.maxDrawdown, value: q.finalValue };
+    });
+    draw();
+    $("status").textContent = "";
+  }
+  function draw() {
+    if (!lastRun) return;
+    valueChart(lastSeries);
+    allocationChart(lastRun);
+    mapChart(lastCurrent, lastBench);
+  }
+
+
+  let width = 0;
+  new ResizeObserver(() => { const w = $("value-chart").clientWidth; if (Math.abs(w - width) > 4) { width = w; draw(); } }).observe(document.querySelector(".page"));
+  if (window.matchMedia) window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", draw);
+  new MutationObserver(draw).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+
+  sync();
+  update();
+})();
+</script>
+</body>
+</html>
